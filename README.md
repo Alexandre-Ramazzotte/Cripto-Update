@@ -9,7 +9,5 @@ Instructions:
 -Install Python interpreter 
 -Install:
   The libs in the executable
-Or:
--Use the .exe
 
 Video: https://www.youtube.com/watch?v=DJyV1eILBCM

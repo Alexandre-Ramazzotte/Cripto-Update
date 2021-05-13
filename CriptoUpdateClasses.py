@@ -1,5 +1,4 @@
 import time
-import requests
 import pandas as pd
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -41,6 +40,7 @@ class WebScraping():
     def ws_get_table(self):
         url2 = "https://coinmarketcap.com/watchlist/"
         self.driver.get(url2)
+        time.sleep(3)
         #Fecha pop-up
         try:
             self.driver.find_element_by_xpath(
@@ -56,7 +56,7 @@ class WebScraping():
         table = soup.find (name='table')
         df_full = pd.read_html(str(table))[0]
         #Arruma as colunas do Data Frame
-        df = df_full[['Name', 'Price', '24h', 'Circulating Supply', 'Volume']] 
+        df = df_full[['Name', 'Price', '24h %', 'Circulating Supply', 'Volume(24h)']] 
         df.columns = ['Nome', 'Preço', '24h %', 'Supply', 'Volume 24h']
 
         #Transforma dados em dicionário
@@ -64,49 +64,48 @@ class WebScraping():
         criptos = df.to_dict('records')
 
         #Arruma volume
-        for coin in criptos:
-            splitted = coin['Volume 24h'].split(',')
-            formatted1 = ''
+        try:
+            for coin in criptos:
+                splitted = coin['Volume 24h'].split(',')
+                formatted1 = ''
 
-            for index, nums in enumerate(splitted):
-                if len(nums) > 3 and '$' not in nums:
-                    nums1 = nums[:3]
-                    nums2 = nums[3:]
-                    formatted1 += nums1
-                    formatted2 = nums2
-                    for cripto_num in splitted[index +1:]:
-                        formatted2 += cripto_num
-                    break
-                else:
-                    formatted1 += nums
-            
-            try:
+                for index, nums in enumerate(splitted):
+                    if len(nums) > 3 and '$' not in nums:
+                        nums1 = nums[:3]
+                        nums2 = nums[3:]
+                        formatted1 += nums1
+                        formatted2 = nums2
+                        for cripto_num in splitted[index +1:]:
+                            formatted2 += cripto_num
+                        break
+                    else:
+                        formatted1 += nums
                 formatted1 = "$" + "{:,}".format(int(formatted1[1:]))
-            except:
-                pass
-            try:
                 for i, alg in enumerate(formatted2):
                     if alg.isalpha():
-                        index = i
                         formatted2 = "{:,}".format(int(formatted2[:i])) + " " + formatted2[i:]
                         break
-            except:
-                pass
-            volume = formatted1 + '  /  ' + formatted2
-            coin['Volume 24h'] = volume
-
+                volume = formatted1 + '  /  ' + formatted2
+                coin['Volume 24h'] = volume
+        except:
+            pass
+                
         #Arruma nome
-        for coin in criptos:
-            splitted = list(coin['Nome'])
-            formatName = ''
-            for index, char in enumerate(splitted):
-                if char.isdigit():
-                    withoutNumbers = splitted[:index]
-                    formatName = ''.join(withoutNumbers)
-                    break
-            coin['Nome'] = formatName
-
+        try:
+            for coin in criptos:
+                splitted = list(coin['Nome'])
+                formatName = ''
+                for index, char in enumerate(splitted):
+                    if char.isdigit():
+                        withoutNumbers = splitted[:index]
+                        formatName = ''.join(withoutNumbers)
+                        break
+                coin['Nome'] = formatName
+        except:
+            pass
+        
         #Fecha
+        self.driver.quit()
         return criptos
 
 #WRITE TO EXCEL:
@@ -198,27 +197,28 @@ class GUI():
                 remember = self.values['remember']
                 frequencia = self.values['update']
 
-                web_scraping = WebScraping()
-                web_scraping.ws_login((email, senha))
                 def update():
+                    web_scraping = WebScraping()
+                    web_scraping.ws_login((email, senha))
+                    if remember == True:
+                        with open ('data.json', 'w') as f:
+                            json.dump([email, senha, 'True', frequencia], f)
+                    else:
+                        with open ('data.json', 'w') as f:
+                            json.dump(['','', 'False', ''], f)
                     try:
-                        if remember == True:
-                            with open ('data.json', 'w') as f:
-                                json.dump([email, senha, 'True', frequencia], f)
-                        else:
-                            with open ('data.json', 'w') as f:
-                                json.dump(['','', 'False', ''], f)
                         criptos = web_scraping.ws_get_table()
-                        print('AQUI')
+                        print('Atualização')
                         to_excel = ToExcel(criptos)
                         to_excel.format_data()
                         to_excel.insert_data(file)
+                        del web_scraping
                     except:
-                        print('Credenciais Inválidas')
-                        quit_web()
+                        print('Erro')
+                        quit_web(web_scraping)
                 
-                def quit_web():
-                    web_scraping.driver.quit()
+                def quit_web(obj):
+                    obj.driver.quit()
                 
                 update()
                 if frequencia.isnumeric():
@@ -242,7 +242,7 @@ def notNone(obj):
 user_interface = GUI()
 user_interface.Iniciar('Portfólio.xlsx')
 
-#terminar frequencia, botao de stop e browse
+#browse e debugg
 
 
 
